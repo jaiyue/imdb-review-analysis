@@ -1,0 +1,20 @@
+from gensim import corpora
+from gensim.models import LdaModel
+
+# 构建词典和文档-词矩阵
+dictionary = corpora.Dictionary(clean_corpus)
+doc_term_matrix = [dictionary.doc2bow(doc) for doc in clean_corpus]
+
+# LDA模型训练
+lda_model = LdaModel(
+    corpus=doc_term_matrix,
+    id2word=dictionary,
+    num_topics=5,      # 可调整
+    random_state=42,
+    passes=10
+)
+
+# 输出主题
+topics = lda_model.print_topics(num_topics=5, num_words=6)
+for topic in topics:
+    print(topic)
