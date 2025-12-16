@@ -10,13 +10,11 @@ nltk.download('stopwords')
 nltk.download('wordnet')
 nltk.download('omw-1.4')
 
-# 读取 CSV
-df = pd.read_csv(
-    "IMDB_Scraper/reviews/1_Zootropolis_2016_reviews_20251212_143302.csv")
+# 读取 CSV - 使用新的文件名
+df = pd.read_csv("reviews/reviews.csv")
 
-# 合并标题和正文
-df["text"] = df["Review_Title"].fillna(
-    "") + " " + df["Review_Content"].fillna("")
+# 合并标题和正文 - 保持原逻辑不变
+df["text"] = df["Review_Title"].fillna("") + " " + df["Review_Content"].fillna("")
 
 # 文本清洗函数
 stop_words = set(stopwords.words("english"))
@@ -28,7 +26,6 @@ stop_words.update([
     "character", "story", "animation", "animal", "time", "world", "see", "love"
 ])
 
-punctuation = set(string.punctuation)
 lemmatizer = WordNetLemmatizer()
 
 def clean_text(doc):
@@ -47,8 +44,11 @@ def clean_text(doc):
 
     return ' '.join(words)
 
-
 # 构建清洗后的语料
 df["clean_text"] = df["text"].dropna().apply(clean_text)
+
+# 保持原输出格式不变，保存清洗后的文本
 df_clean = pd.DataFrame({'clean_text': df["clean_text"]})
 df_clean.to_csv("rq1_2_cleaned_reviews.csv", index=False)
+
+print(f"Cleaned {len(df)} reviews and saved to rq1_2_cleaned_reviews.csv")
