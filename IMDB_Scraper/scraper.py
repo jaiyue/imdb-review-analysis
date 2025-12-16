@@ -1,3 +1,4 @@
+# from https://github.com/plengxvi/movie_user_review_scraper
 # scraper.py
 import pandas as pd
 from selenium import webdriver
@@ -9,7 +10,7 @@ import time
 import os
 import re
 import random
-from datetime import datetime
+import hashlib
 
 def clean_review_content(content_text, title_text=""):
     """Clean review content, remove ratings and duplicate titles"""
@@ -35,79 +36,6 @@ def clean_review_content(content_text, title_text=""):
     
     return content_text.strip()
 
-def extract_vote_counts(review_element):
-    """Extract vote counts"""
-    helpful_count = 0
-    not_helpful_count = 0
-    
-    try:
-        vote_selectors = [
-            '.ipc-voting',
-            '.review-helpful',
-            '[class*="vote"]',
-            '[class*="helpful"]',
-            '.ipc-list-card_actions'
-        ]
-        
-        vote_section = None
-        for selector in vote_selectors:
-            try:
-                vote_section = review_element.find_element(By.CSS_SELECTOR, selector)
-                if vote_section:
-                    break
-            except:
-                continue
-        
-        if vote_section:
-            vote_html = vote_section.get_attribute('innerHTML')
-            
-            helpful_patterns = [
-                r'helpful.*?(\d+)',
-                r'(\d+)\s*people found this helpful',
-                r'helpful.*?>\s*(\d+)\s*<',
-                r'ipc-voting_label_count--up.*?>(\d+)<',
-                r'data-value="(\d+)"[^>]*data-testid="helpful-button"'
-            ]
-            
-            for pattern in helpful_patterns:
-                match = re.search(pattern, vote_html, re.IGNORECASE)
-                if match:
-                    try:
-                        helpful_count = int(match.group(1))
-                        break
-                    except:
-                        pass
-            
-            not_helpful_patterns = [
-                r'not.*?helpful.*?(\d+)',
-                r'unhelpful.*?(\d+)',
-                r'ipc-voting_label_count--down.*?>(\d+)<',
-                r'data-value="(\d+)"[^>]*data-testid="unhelpful-button"'
-            ]
-            
-            for pattern in not_helpful_patterns:
-                match = re.search(pattern, vote_html, re.IGNORECASE)
-                if match:
-                    try:
-                        not_helpful_count = int(match.group(1))
-                        break
-                    except:
-                        pass
-            
-            if helpful_count == 0 and not_helpful_count == 0:
-                vote_text = vote_section.text.lower()
-                if 'helpful' in vote_text:
-                    numbers = re.findall(r'\d+', vote_text)
-                    if len(numbers) >= 2:
-                        helpful_count = int(numbers[0])
-                        not_helpful_count = int(numbers[1])
-                    elif len(numbers) == 1:
-                        helpful_count = int(numbers[0])
-    
-    except Exception as e:
-        print(f"  Error extracting votes: {e}")
-    
-    return helpful_count, not_helpful_count
 
 def click_see_all_button(driver):
     """Click 'See All' button to expand all reviews"""
@@ -154,42 +82,14 @@ def click_see_all_button(driver):
                             
                             break
                         
-                except Exception as e:
+                except Exception:
                     continue
             
             if clicked:
                 break
                 
-        except Exception as e:
+        except Exception:
             continue
-    
-    if not clicked:
-        try:
-            see_all_button = driver.execute_script("""
-                const buttons = document.querySelectorAll('button, span, a');
-                for (let btn of buttons) {
-                    if (btn.innerText && btn.innerText.trim().toLowerCase().includes('see all')) {
-                        return btn;
-                    }
-                }
-                return null;
-            """)
-            
-            if see_all_button:
-                print(f"Found 'See All' button via JavaScript: {see_all_button.text.strip()}")
-                
-                driver.execute_script("arguments[0].scrollIntoView({behavior: 'smooth', block: 'center'});", see_all_button)
-                time.sleep(0.5)
-                
-                if see_all_button.is_displayed() and see_all_button.is_enabled():
-                    see_all_button.click()
-                    print("Clicked 'See All' button (via JS)")
-                    clicked = True
-                    
-                    wait_time = random.uniform(3, 5)
-                    time.sleep(wait_time)
-        except Exception as e:
-            pass
     
     if not clicked:
         print("'See All' button not found or not clickable")
@@ -200,7 +100,6 @@ def expand_all_spoilers(driver):
     """Expand all spoiler buttons on the page"""
     try:
         spoiler_selectors = [
-            'button.ipc-btn.ipc-btn--single-padding.ipc-btn--center-align-content.ipc-btn--default-height.ipc-btn--core-base.ipc-btn--theme-base.ipc-btn--button-radius.ipc-btn--on-error.ipc-text-button.sc-b8d6d2b6-1.beKHlT.review-spoiler-button',
             'button.review-spoiler-button',
             'button[class*="review-spoiler-button"]',
             'button[aria-label*="Expand Spoiler"]',
@@ -217,63 +116,15 @@ def expand_all_spoilers(driver):
             except:
                 continue
         
-        unique_buttons = []
-        seen_ids = set()
-        for button in spoiler_buttons:
-            try:
-                btn_id = button.id or button.get_attribute('data-testid') or button.get_attribute('aria-label')
-                if not btn_id:
-                    btn_id = f"{button.tag_name}_{button.location['x']}_{button.location['y']}"
-                
-                if btn_id not in seen_ids:
-                    seen_ids.add(btn_id)
-                    unique_buttons.append(button)
-            except:
-                unique_buttons.append(button)
-        
-        spoiler_buttons = unique_buttons
-        
         expanded_count = 0
         for button in spoiler_buttons:
             try:
                 if not button.is_displayed():
                     continue
-                
-                try:
-                    button_text = button.text.strip().lower()
-                    aria_label = button.get_attribute('aria-label') or ""
-                    aria_label_lower = aria_label.lower()
-                    
-                    is_spoiler_button = (
-                        'spoiler' in button_text or 
-                        'spoiler' in aria_label_lower or
-                        'expand' in button_text or
-                        'show' in button_text
-                    )
-                    
-                    if is_spoiler_button:
-                        driver.execute_script("""
-                            const element = arguments[0];
-                            const yOffset = -100;
-                            const y = element.getBoundingClientRect().top + window.pageYOffset + yOffset;
-                            window.scrollTo({top: y, behavior: 'smooth'});
-                        """, button)
-                        time.sleep(0.5)
-                        
-                        driver.execute_script("arguments[0].click();", button)
-                        expanded_count += 1
-                        time.sleep(0.3)
-                        
-                except Exception as click_error:
-                    try:
-                        if button.is_enabled():
-                            button.click()
-                            expanded_count += 1
-                            time.sleep(0.3)
-                    except Exception as regular_error:
-                        continue
-                        
-            except Exception as e:
+                driver.execute_script("arguments[0].click();", button)
+                expanded_count += 1
+                time.sleep(0.3)
+            except Exception:
                 continue
         
         time.sleep(1)
@@ -282,7 +133,7 @@ def expand_all_spoilers(driver):
         print(f"Error finding spoiler buttons: {e}")
 
 def get_unique_reviews(driver):
-    """Get unique reviews, avoid duplicates"""
+    """Get unique reviews, avoid duplicates using hash of title + content"""
     review_selectors = [
         '[data-testid="review-card-parent"]',
         'div[class*="review-container"]',
@@ -298,43 +149,38 @@ def get_unique_reviews(driver):
             elements = driver.find_elements(By.CSS_SELECTOR, selector)
             if elements:
                 review_elements.extend(elements)
-        except Exception as e:
+        except Exception:
             continue
     
     unique_reviews = []
-    seen_ids = set()
+    seen_hashes = set()
     
     for review in review_elements:
         try:
-            review_id = review.get_attribute('id') or review.get_attribute('data-review-id')
+            # 提取标题和内容作为哈希依据
+            try:
+                title_element = review.find_element(By.CSS_SELECTOR, 
+                    '.ipc-title.ipc-title--title, h3[class*="title"]')
+                title = title_element.text.strip()
+            except:
+                title = ""
             
-            if not review_id:
-                try:
-                    title = ""
-                    try:
-                        title_element = review.find_element(By.CSS_SELECTOR, 
-                            '.ipc-title.ipc-title--base.ipc-title--title.ipc-title--on-textPrimary.sc-b8d6d2b6-7.fUoiwh')
-                        title = title_element.text.strip()[:50]
-                    except:
-                        try:
-                            title_element = review.find_element(By.CSS_SELECTOR, 
-                                '.ipc-title.ipc-title--title, h3[class*="title"]')
-                            title = title_element.text.strip()[:50]
-                        except:
-                            pass
-                    
-                    if title:
-                        review_id = f"title_{hash(title)}"[:100]
-                    else:
-                        review_id = f"review_{len(unique_reviews)}"
-                except:
-                    review_id = f"review_{len(unique_reviews)}"
+            try:
+                content_element = review.find_element(By.CSS_SELECTOR, 
+                    '.ipc-html-content-inner-div, .text.show-more__control, .content .text, .review-text')
+                content = content_element.text.strip()
+            except:
+                content = ""
             
-            if review_id not in seen_ids:
-                seen_ids.add(review_id)
+            # 生成唯一 hash
+            hash_input = (title + content).encode('utf-8')
+            review_hash = hashlib.md5(hash_input).hexdigest()
+            
+            if review_hash not in seen_hashes:
+                seen_hashes.add(review_hash)
                 unique_reviews.append(review)
                 
-        except Exception as e:
+        except Exception:
             unique_reviews.append(review)
     
     return unique_reviews
@@ -356,252 +202,173 @@ def check_and_click_see_all_after_scroll(driver):
 
 def get_review_data(driver, movie_url, movie_id):
     """
-    Main function: Get review data
+    Main function: Get review data without vote counts
     """
     print(f"Accessing: {movie_url}")
     driver.get(movie_url)
     
-    wait_time = random.uniform(4, 6)
-    time.sleep(wait_time)
-    
+    time.sleep(random.uniform(4, 6))
     page_title = driver.title
     print(f"Page title: {page_title}")
     
+    # 点击 cookie 按钮
     try:
         cookie_button = WebDriverWait(driver, 10).until(
             EC.element_to_be_clickable((By.CSS_SELECTOR, 'button[data-testid="accept-button"]'))
         )
         cookie_button.click()
         time.sleep(1)
-        print("Accepted Cookie")
     except:
-        print("Cookie button not found or already accepted")
+        pass
     
-    clicked = click_see_all_button(driver)
+    # 点击 See All 按钮
+    if click_see_all_button(driver):
+        time.sleep(3)
     
-    if clicked:
-        extra_wait = random.uniform(2, 4)
-        time.sleep(extra_wait)
-    
+    # 展开剧透
     expand_all_spoilers(driver)
     
+    # 滚动并再次检查是否需要点击
     driver.execute_script("window.scrollTo(0, document.body.scrollHeight);")
     time.sleep(2)
     
-    check_and_click_see_all_after_scroll(driver)
+    # 检查是否有更多内容需要加载
+    initial_count = len(get_unique_reviews(driver))
+    if click_see_all_button(driver):
+        time.sleep(3)
+        new_count = len(get_unique_reviews(driver))
+        if new_count > initial_count:
+            print(f"Loaded more reviews: {initial_count} → {new_count}")
     
+    # 再次展开剧透
     expand_all_spoilers(driver)
     time.sleep(2)
     
+    # 获取所有评论元素
     review_elements = get_unique_reviews(driver)
-    
     if not review_elements:
         print("Error: No reviews found!")
-        return None, None
+        # 返回空列表而不是 None, None
+        return [], [], [], [], page_title
     
     title_list = []
     content_list = []
-    helpful_list = []
-    not_helpful_list = []
     has_spoiler_list = []
     rating_list = []
     
+    print(f"Processing {len(review_elements)} reviews...")
+    
     for i, review in enumerate(review_elements):
         try:
-            if (i + 1) % 20 == 0:
-                print(f"Processing progress: {i+1}/{len(review_elements)}")
-            
+            # 提取标题
             title = ""
-            try:
-                title_selectors = [
-                    '.ipc-title.ipc-title--base.ipc-title--title.ipc-title--on-textPrimary.sc-b8d6d2b6-7.fUoiwh',
-                    '.ipc-title.ipc-title--title',
-                    'h3[class*="title"]',
-                    'a[class*="title"]',
-                    '.title',
-                    '[data-testid*="title"]'
-                ]
-                
-                for selector in title_selectors:
-                    try:
-                        title_element = review.find_element(By.CSS_SELECTOR, selector)
-                        title_text = title_element.text.strip()
-                        if title_text:
-                            title = title_text
-                            break
-                    except:
-                        continue
-                
-                if not title:
-                    try:
-                        parent = review.find_element(By.XPATH, "..")
-                        for selector in title_selectors:
-                            try:
-                                title_element = parent.find_element(By.CSS_SELECTOR, selector)
-                                title_text = title_element.text.strip()
-                                if title_text:
-                                    title = title_text
-                                    break
-                            except:
-                                continue
-                    except:
-                        pass
-                        
-            except Exception as e:
-                pass
-            
-            content = ""
-            try:
-                content_element = review.find_element(By.CSS_SELECTOR, '.ipc-html-content-inner-div')
-                content = content_element.text.strip()
-            except:
+            title_selectors = [
+                '.ipc-title.ipc-title--base.ipc-title--title.ipc-title--on-textPrimary.sc-b8d6d2b6-7.fUoiwh',
+                '.ipc-title.ipc-title--title',
+                'h3[class*="title"]',
+                '.title'
+            ]
+            for selector in title_selectors:
                 try:
-                    content_selectors = [
-                        '.text.show-more__control',
-                        '.content .text',
-                        '.review-text',
-                        '.content',
-                        'div[class*="content"]'
-                    ]
-                    
-                    for selector in content_selectors:
-                        try:
-                            content_element = review.find_element(By.CSS_SELECTOR, selector)
-                            if content_element.text.strip():
-                                content = content_element.text.strip()
-                                break
-                        except:
-                            continue
-                except Exception as e:
-                    pass
-            
-            if content:
-                content = clean_review_content(content, title)
-            
-            has_spoiler = False
-            try:
-                if content and any(keyword in content.lower()[:200] for keyword in ['spoiler']):
-                    has_spoiler = True
-                
-                try:
-                    spoiler_button = review.find_element(By.CSS_SELECTOR, 
-                        '.review-spoiler-button, button[aria-label*="spoiler"]')
-                    if spoiler_button:
-                        has_spoiler = True
+                    title_element = review.find_element(By.CSS_SELECTOR, selector)
+                    if title_element.text.strip():
+                        title = title_element.text.strip()
+                        break
                 except:
-                    pass
-                    
-            except:
-                pass
+                    continue
             
-            helpful_count, not_helpful_count = extract_vote_counts(review)
+            # 提取内容
+            content = ""
+            content_selectors = [
+                '.ipc-html-content-inner-div',
+                '.text.show-more__control',
+                '.content .text',
+                '.review-text'
+            ]
+            for selector in content_selectors:
+                try:
+                    content_element = review.find_element(By.CSS_SELECTOR, selector)
+                    if content_element.text.strip():
+                        content = clean_review_content(content_element.text.strip(), title)
+                        break
+                except:
+                    continue
             
-            rating = "No rating"
+            # 是否包含剧透
+            has_spoiler = "No"
+            if content and 'spoiler' in content.lower()[:200]:
+                has_spoiler = "Yes"
             try:
-                rating_selectors = [
-                    '.rating-other-user-rating span',
-                    '.rating-other-user-rating',
-                    '[class*="rating"] span',
-                    'span[class*="rating"]',
-                    '.ipc-rating-star'
-                ]
-                
-                for selector in rating_selectors:
-                    try:
-                        rating_element = review.find_element(By.CSS_SELECTOR, selector)
-                        rating_text = rating_element.text.strip()
-                        match = re.search(r'(\d+)(?:\s*/\s*10)?', rating_text)
-                        if match:
-                            rating = f"{match.group(1)}/10"
-                            break
-                    except:
-                        continue
+                spoiler_button = review.find_element(By.CSS_SELECTOR, '.review-spoiler-button, button[aria-label*="spoiler"]')
+                if spoiler_button:
+                    has_spoiler = "Yes"
             except:
                 pass
+            
+            # 提取评分
+            rating = "No rating"
+            rating_selectors = ['.rating-other-user-rating span', '.ipc-rating-star']
+            for selector in rating_selectors:
+                try:
+                    rating_element = review.find_element(By.CSS_SELECTOR, selector)
+                    match = re.search(r'(\d+)(?:\s*/\s*10)?', rating_element.text.strip())
+                    if match:
+                        rating = f"{match.group(1)}/10"
+                        break
+                except:
+                    continue
             
             title_list.append(title)
             content_list.append(content)
-            helpful_list.append(helpful_count)
-            not_helpful_list.append(not_helpful_count)
-            has_spoiler_list.append("Yes" if has_spoiler else "No")
+            has_spoiler_list.append(has_spoiler)
             rating_list.append(rating)
             
         except Exception as e:
             title_list.append("")
             content_list.append("")
-            helpful_list.append(0)
-            not_helpful_list.append(0)
             has_spoiler_list.append("Error")
             rating_list.append("Error")
             continue
     
     print(f"\nDone! Processed total {len(review_elements)} reviews")
-    return (title_list, content_list, helpful_list, not_helpful_list, 
-            has_spoiler_list, rating_list, page_title)
+    return title_list, content_list, has_spoiler_list, rating_list, page_title
 
 def save_results(data, movie_id, movie_url, folder_name='reviews'):
-    """Save results to CSV file"""
-    (title_list, content_list, helpful_list, not_helpful_list, 
-     has_spoiler_list, rating_list, page_title) = data
+    """Save results without vote counts or scrape time"""
+    title_list, content_list, has_spoiler_list, rating_list, page_title = data
     
-    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    if not os.path.exists(folder_name):
+        os.makedirs(folder_name)
     
-    try:
-        movie_title = page_title.split('-')[0].strip()
-        safe_title = re.sub(r'[^\w\s-]', '', movie_title).strip().replace(' ', '_')[:50]
-    except:
-        safe_title = f"movie_{movie_id}"
+    # 数据 CSV，Review_Index 放在第一列
+    df = pd.DataFrame({
+        'Review_Index': list(range(1, len(content_list)+1)),
+        'Review_Title': title_list,
+        'Review_Content': content_list,
+        'Has_Spoiler': has_spoiler_list,
+        'Rating': rating_list,
+        'movie_id': [movie_id]*len(content_list)
+    })
+    output_file = f'{folder_name}/reviews.csv'
+    df.to_csv(output_file, index=False, encoding='utf-8')
+    print(f"✓ Data saved to: {output_file}")
     
-    print(f"\n{'='*60}")
-    print(f"Data Statistics")
-    print(f"{'='*60}")
-    print(f"Total reviews: {len(content_list)}")
-    print(f"Valid titles: {sum(1 for t in title_list if t and len(t) > 0)}")
-    print(f"Valid content: {sum(1 for c in content_list if c and len(c) > 10)}")
-    print(f"Reviews with spoilers: {sum(1 for s in has_spoiler_list if s == 'Yes')}")
-    print(f"Total helpful votes: {sum(helpful_list)}")
-    print(f"Total not helpful votes: {sum(not_helpful_list)}")
+    # 统计 CSV
+    stats = {
+        'Total_Reviews': len(content_list),
+        'Reviews_with_Title': sum(1 for t in title_list if t),
+        'Reviews_with_Content': sum(1 for c in content_list if c and len(c) > 10),
+        'Reviews_with_Spoiler': sum(1 for s in has_spoiler_list if s == 'Yes'),
+        'Movie_ID': movie_id,
+        'URL': movie_url,
+        'Page_Title': page_title
+    }
+    stats_df = pd.DataFrame([stats])
+    stats_file = f'{folder_name}/stats.csv'
+    stats_df.to_csv(stats_file, index=False, encoding='utf-8')
+    print(f"✓ Statistics saved to: {stats_file}")
     
-    if content_list:
-        df = pd.DataFrame({
-            'Review_Title': title_list,
-            'Review_Content': content_list,
-            'Helpful_Count': helpful_list,
-            'Not_Helpful_Count': not_helpful_list,
-            'Has_Spoiler': has_spoiler_list,
-            'Rating': rating_list,
-            'Review_Index': list(range(1, len(content_list) + 1)),
-            'movie_id': [movie_id] * len(content_list),
-            'Scrape_Time': [datetime.now().strftime("%Y-%m-%d %H:%M:%S")] * len(content_list)
-        })
-        
-        output_file = f'{folder_name}/{movie_id}_{safe_title}_reviews_{timestamp}.csv'
-        df.to_csv(output_file, index=False, encoding='utf-8')
-        print(f"\n✓ Data saved to: {output_file}")
-        
-        stats = {
-            'Total_Reviews': len(content_list),
-            'Reviews_with_Title': sum(1 for t in title_list if t and len(t) > 0),
-            'Reviews_with_Content': sum(1 for c in content_list if c and len(c) > 10),
-            'Reviews_with_Spoiler': sum(1 for s in has_spoiler_list if s == 'Yes'),
-            'Total_Helpful_Votes': sum(helpful_list),
-            'Total_Not_Helpful_Votes': sum(not_helpful_list),
-            'Average_Helpful_per_Review': sum(helpful_list) / len(helpful_list) if helpful_list else 0,
-            'Average_Not_Helpful_per_Review': sum(not_helpful_list) / len(not_helpful_list) if not_helpful_list else 0,
-            'Movie_ID': movie_id,
-            'URL': movie_url,
-            'Scrape_Time': datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-            'Page_Title': page_title
-        }
-        
-        stats_df = pd.DataFrame([stats])
-        stats_file = f'{folder_name}/{movie_id}_{safe_title}_stats_{timestamp}.csv'
-        stats_df.to_csv(stats_file, index=False, encoding='utf-8')
-        print(f"\n✓ Statistics saved to: {stats_file}")
-        
-        return output_file, stats_file
-    
-    return None, None
+    return output_file, stats_file
 
 def main():
     """Main function"""
@@ -609,11 +376,10 @@ def main():
     if not os.path.exists(folder_name):
         os.makedirs(folder_name)
     
-    PATH = "./ChromeDrive/chromedriver/chromedriver"
+    PATH = "IMDB_Scraper/ChromeDrive/chromedriver/chromedriver"
     
     if not os.path.exists(PATH):
         print(f"Error: ChromeDriver file does not exist: {PATH}")
-        print("Please ensure file path is correct or re-download ChromeDriver")
         return
     
     os.system(f"chmod +x {PATH}")
@@ -643,7 +409,8 @@ def main():
         
         data = get_review_data(driver, movie_url, movie_id)
         
-        if data[0] is not None:
+        # 检查是否成功获取了数据
+        if data and len(data[0]) > 0:  # 检查 title_list 是否非空
             data_file, stats_file = save_results(data, movie_id, movie_url, folder_name)
             
             if data_file:
@@ -653,7 +420,7 @@ def main():
             else:
                 print("\n✗ Scraping failed, no data saved")
         else:
-            print("\n✗ Failed to retrieve review data")
+            print("\n✗ Failed to retrieve review data or no reviews found")
             
     except Exception as e:
         print(f"\n✗ Error during scraper execution: {e}")
