@@ -1,0 +1,21 @@
+Topic_ID,Keywords,Num_of_Reviews,Percentage,Avg_Probability,Gini,Entropy,Concentration_Level
+0,"way, character, message, much, animal, judy_hopps",179,18.82,15.36,0.807,92.481,Very High
+19,"character, lot, animal, watch, kid, message",92,9.67,10.3,0.865,73.737,Very High
+15,"kid, movie, many, character, judy, scene",72,7.57,7.97,0.898,51.665,Very High
+6,"character, movie, ever, many, animal, could",56,5.89,6.25,0.92,38.795,Very High
+1,"character, zootropolis, kid, way, animated, city",56,5.89,6.06,0.915,46.831,Very High
+5,"judy, nick, fox, animal, predator, life",52,5.47,5.42,0.912,53.924,Very High
+17,"animated, movie, amazing, message, character, plot",47,4.94,5.15,0.935,27.017,Very High
+4,"animal, character, watched, watch, real, entertaining",44,4.63,4.49,0.943,19.989,Very High
+10,"kid, thing, movie, funny, year, watch",41,4.31,4.54,0.939,27.946,Very High
+16,"character, kid, much, way, city, animal",41,4.31,4.33,0.945,19.115,Very High
+18,"people, know, thing, character, everything, another",37,3.89,3.99,0.945,23.683,Very High
+13,"character, animal, city, judy, stereotype, way",35,3.68,3.96,0.941,30.04,Very High
+3,"character, movie, dont, u, message, animal",33,3.47,3.59,0.949,21.004,Very High
+9,"humor, watch, u, plot, character, thing",30,3.15,3.1,0.955,13.731,Very High
+11,"character, film, animated, kid, 3d, judy_hopps",29,3.05,3.62,0.948,23.069,Very High
+8,"lot, city, kid, funny, friend, line",26,2.73,3.1,0.954,17.123,Very High
+14,"humor, animal, judy, bunny, officer, city",24,2.52,2.58,0.957,15.275,Very High
+7,"judy, dream, animal, people, city, case",21,2.21,2.24,0.96,12.4,Very High
+2,"judy, fox, predator, city, message, rabbit",21,2.21,2.35,0.955,19.84,Very High
+12,"message, judy_hopps, mean, perfect, smallest_shrew, largest_elephant",15,1.58,1.6,0.961,9.876,Very High

@@ -1,18 +1,18 @@
-# 核心数据处理
+# Core data processing
 pandas>=1.5.0
 numpy>=1.24.0
 
-# 网页爬虫相关
+# Web scraping
 selenium>=4.10.0
 
-# 自然语言处理
+# Natural language processing
 gensim>=4.3.0
 nltk>=3.8.0
-scikit-learn>=1.3.0  # 可选，用于文本处理扩展
+scikit-learn>=1.3.0
 
-# 文本处理支持
+# Text processing support
 regex>=2023.0.0
 
-# 其他工具
+# Other utilities
 python-dateutil>=2.8.0
-textblob>=0.19.0  # 可选，用于文本情感分析
+textblob>=0.19.0

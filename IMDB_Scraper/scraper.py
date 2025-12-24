@@ -372,7 +372,7 @@ def save_results(data, movie_id, movie_url, folder_name='reviews'):
 
 def main():
     """Main function"""
-    folder_name = 'reviews'
+    folder_name = 'raw'
     if not os.path.exists(folder_name):
         os.makedirs(folder_name)
     
