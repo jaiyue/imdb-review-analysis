@@ -1,6 +1,4 @@
 # Zootopia IMDb Review Analysis – personal notes
-
-## What is this?
 This project performs textual analysis on IMDb user reviews for *Zootopia*.
 
 It consists of three research questions:
